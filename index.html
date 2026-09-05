@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Arcade Hub</title>
+    
+    <!-- Telegram Web App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- AdsGram SDK -->
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+
+    <!-- Confetti Animation Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: { colors: { brand: { bg: '#09090b', surface: '#18181b', accent: '#8b5cf6', neon: '#a78bfa' } } } } }
+    </script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { user-select: none; -webkit-user-select: none; background-color: #09090b; color: #fff; font-family: sans-serif; touch-action: manipulation; overflow-x: hidden; }
+        .neon-glow { box-shadow: 0 0 15px rgba(139, 92, 246, 0.4); }
+        .card-glow { box-shadow: 0 10px 30px -10px rgba(139, 92, 246, 0.4); }
+        
+        .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
+        .modal-content { transition: transform 0.3s ease; transform: translateY(100%); }
+        .modal.open { opacity: 1; visibility: visible; }
+        .modal.open .modal-content { transform: translateY(0); }
+        .scrollable { overflow-y: auto; overflow-x: hidden; padding-bottom: 100px; height: 100vh; }
+        ::-webkit-scrollbar { display: none; }
+
+        .flip-container { perspective: 1000px; cursor: pointer; width: 100%; aspect-ratio: 1/1; }
+        .flip-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.4s cubic-bezier(0.4, 0.2, 0.2, 1); transform-style: preserve-3d; }
+        .flip-container.flipped .flip-inner { transform: rotateY(180deg); }
+        .flip-front, .flip-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; font-size: 2rem; border: 2px solid rgba(255,255,255,0.05); }
+        .flip-front { background: linear-gradient(145deg, #27272a, #18181b); }
+        
+        .flip-back { transform: rotateY(180deg); background: #18181b; }
+        .back-match { border-color: #8b5cf6; box-shadow: inset 0 0 10px rgba(139, 92, 246, 0.2); }
+        .matched .flip-back { border-color: #10b981; box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.4); background: #064e3b; }
+        .matched { pointer-events: none; } 
+
+        .back-mine-safe { border-color: #10b981; box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.3); }
+        .back-mine-bomb { background: #450a0a; border-color: #ef4444; box-shadow: inset 0 0 20px rgba(239, 68, 68, 0.6); }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <header class="p-4 bg-brand-surface border-b border-gray-800 flex justify-between items-center fixed top-0 w-full z-40 max-w-md left-1/2 -translate-x-1/2 backdrop-blur-md">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-brand-accent flex items-center justify-center font-bold text-white neon-glow">
+                <i class="fa-solid fa-user-astronaut"></i>
+            </div>
+            <div>
+                <h2 class="font-bold text-sm text-gray-200" id="username">Player</h2>
+            </div>
+        </div>
+        <div class="bg-gray-900 px-4 py-2 rounded-xl border border-brand-accent/50 flex items-center space-x-2">
+            <i class="fa-solid fa-gem text-brand-neon"></i>
+            <span class="font-extrabold text-white text-lg" id="user-gems">1000</span>
+        </div>
+    </header>
+
+    <main class="w-full max-w-md mx-auto pt-20 scrollable">
+        
+        <!-- GAMES TAB -->
+        <section id="tab-games" class="tab-content p-4 space-y-4 animate-fade-in">
+            <div onclick="openModal('match-modal')" class="relative overflow-hidden bg-gradient-to-br from-brand-surface to-gray-900 rounded-3xl p-6 border border-gray-700 card-glow cursor-pointer active:scale-95 transition-transform group mt-2">
+                <div class="absolute -right-6 -top-6 text-7xl text-purple-500/10"><i class="fa-solid fa-clone"></i></div>
+                <div class="flex items-center space-x-4 relative z-10">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-3xl shadow-lg border border-purple-400/30">
+                        <i class="fa-solid fa-face-smile-wink text-white"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-black text-white uppercase tracking-wide">Emoji Match</h2>
+                        <p class="text-xs text-brand-neon font-bold mt-1">Train memory!</p>
+                    </div>
+                </div>
+            </div>
+
+            <div onclick="openModal('mines-modal')" class="relative overflow-hidden bg-gradient-to-br from-brand-surface to-gray-900 rounded-3xl p-6 border border-gray-700 card-glow cursor-pointer active:scale-95 transition-transform group">
+                <div class="absolute -right-6 -top-6 text-7xl text-purple-500/10"><i class="fa-solid fa-cubes"></i></div>
+                <div class="flex items-center space-x-4 relative z-10">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-fuchsia-600 to-purple-600 flex items-center justify-center text-3xl shadow-lg border border-fuchsia-400/30">
+                        <i class="fa-solid fa-bomb text-white"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-black text-white uppercase tracking-wide">Crystal Mines</h2>
+                        <p class="text-xs text-green-400 font-bold mt-1">High Risk, High Reward</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TASKS TAB -->
+        <section id="tab-tasks" class="tab-content hidden p-4 space-y-4 animate-fade-in mt-2">
+            <div class="bg-brand-surface border border-gray-800 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 text-xl"><i class="fa-brands fa-telegram"></i></div>
+                    <div>
+                        <h4 class="font-bold text-sm text-gray-100">Join Channel</h4>
+                        <p class="text-xs text-brand-neon font-semibold">+500 Gems</p>
+                    </div>
+                </div>
+                <!-- PUT YOUR CHANNEL LINK HERE -->
+                <button onclick="joinChannelTask('https://t.me/YOUR_CHANNEL_LINK_HERE')" class="px-5 py-2.5 bg-blue-600 text-white font-extrabold rounded-xl text-xs active:scale-95 transition">Join</button>
+            </div>
+            <div class="bg-brand-surface border border-brand-accent/30 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-brand-neon text-xl"><i class="fa-solid fa-video"></i></div>
+                    <div>
+                        <h4 class="font-bold text-sm text-gray-100">Daily Sponsor Ad</h4>
+                        <p class="text-xs text-brand-neon font-semibold">+200 Gems</p>
+                    </div>
+                </div>
+                <button onclick="watchTaskAd()" class="px-5 py-2.5 bg-brand-accent text-white font-extrabold rounded-xl text-xs active:scale-95 transition neon-glow">Watch</button>
+            </div>
+        </section>
+
+        <!-- FRIENDS TAB -->
+        <section id="tab-referral" class="tab-content hidden p-4 space-y-4 animate-fade-in text-center mt-2">
+            <div class="bg-gradient-to-br from-brand-surface to-gray-900 rounded-3xl p-8 border border-brand-accent/30 text-center card-glow my-4">
+                <i class="fa-solid fa-users text-6xl text-brand-neon mb-4"></i>
+                <h2 class="text-xl font-bold text-white mb-2">Share the Fun!</h2>
+                <p class="text-sm text-gray-400 mb-6">Send your special link to your friends and challenge them in Arcade Zone.</p>
+                <button onclick="shareLink()" class="w-full py-4 bg-brand-accent text-white font-black rounded-xl neon-glow active:scale-95 transition flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-share-nodes"></i> SHARE LINK
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-brand-surface/95 border-t border-gray-800 px-2 py-2 z-40 backdrop-blur-md">
+        <div class="flex justify-between items-center">
+            <button onclick="switchTab('games')" id="nav-games" class="nav-btn flex-1 flex flex-col items-center text-brand-neon py-2 transition">
+                <i class="fa-solid fa-gamepad text-xl mb-1"></i><span class="text-[10px] font-bold uppercase">Games</span>
+            </button>
+            <button onclick="switchTab('tasks')" id="nav-tasks" class="nav-btn flex-1 flex flex-col items-center text-gray-500 py-2 transition">
+                <i class="fa-solid fa-list-check text-xl mb-1"></i><span class="text-[10px] font-bold uppercase">Tasks</span>
+            </button>
+            <button onclick="switchTab('referral')" id="nav-referral" class="nav-btn flex-1 flex flex-col items-center text-gray-500 py-2 transition">
+                <i class="fa-solid fa-users text-xl mb-1"></i><span class="text-[10px] font-bold uppercase">Friends</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ==================== MODAL: EMOJI MATCH ==================== -->
+    <div id="match-modal" class="modal fixed inset-0 z-50 flex items-end justify-center opacity-0 invisible bg-black/80 backdrop-blur-sm">
+        <div class="modal-content w-full max-w-md bg-brand-bg rounded-t-3xl border-t border-gray-800 p-5 pb-8 h-[95vh] max-h-[95vh] overflow-y-auto flex flex-col">
+            
+            <div class="flex justify-between items-center mb-4 shrink-0">
+                <!-- Level Navigator -->
+                <div class="flex items-center space-x-3 bg-gray-900 rounded-full px-3 py-1 border border-gray-700">
+                    <button onclick="changeLevel(-1)" class="text-gray-400 active:text-white px-2"><i class="fa-solid fa-chevron-left"></i></button>
+                    <h2 class="text-lg font-black text-brand-neon uppercase w-20 text-center" id="match-level-title">LVL 1</h2>
+                    <button onclick="changeLevel(1)" class="text-gray-400 active:text-white px-2"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+                <button onclick="closeModal('match-modal')" class="w-8 h-8 rounded-full bg-gray-800 text-gray-400 flex items-center justify-center active:scale-90"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="flex justify-between bg-brand-surface p-3 rounded-xl border border-gray-800 mb-3 shrink-0">
+                <div class="text-center w-full">
+                    <p class="text-[10px] text-gray-500 font-bold uppercase">Moves Left</p>
+                    <p class="text-xl font-black text-yellow-400" id="match-moves">3</p>
+                </div>
+            </div>
+
+            <div class="bg-brand-surface p-3 rounded-2xl border border-gray-800 neon-glow flex-1 relative mb-2 flex flex-col justify-center min-h-[50vh]">
+                <div id="match-grid" class="grid gap-2 w-full"></div>
+                
+                <!-- Game Over Overlay (Resume Logic Fixed) -->
+                <div id="match-overlay" class="absolute inset-0 bg-black/95 rounded-2xl flex flex-col items-center justify-center hidden backdrop-blur-md z-20">
+                    <h2 class="text-2xl font-black text-red-500 mb-2 uppercase">Out of Moves!</h2>
+                    <button onclick="reviveMatchWithAd()" class="w-64 py-3 bg-brand-accent text-white font-bold rounded-xl mb-3 active:scale-95 mt-4"><i class="fa-solid fa-video"></i> Resume Game (+3 Moves)</button>
+                    <button onclick="startMatchLevel()" class="text-sm text-gray-500 font-bold uppercase mt-2">Restart Level</button>
+                </div>
+
+                <!-- Level Win Overlay -->
+                <div id="match-win-overlay" class="absolute inset-0 bg-black/95 rounded-2xl flex flex-col items-center justify-center hidden backdrop-blur-md z-30">
+                    <div class="text-6xl mb-4 animate-bounce">🏆</div>
+                    <h2 class="text-4xl font-black text-green-400 mb-2 uppercase">Hooray!</h2>
+                    <p class="text-gray-300 font-semibold mb-6">You beat Level <span id="win-level-num"></span>!</p>
+                    <button onclick="nextMatchLevel()" class="w-64 py-3 bg-brand-accent text-white font-black rounded-xl mb-3 active:scale-95 neon-glow">PLAY NEXT LEVEL</button>
+                    <button onclick="startMatchLevel()" class="w-64 py-3 bg-gray-800 border border-gray-700 text-white font-bold rounded-xl active:scale-95">Restart Current</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL: CRYSTAL MINES ==================== -->
+    <div id="mines-modal" class="modal fixed inset-0 z-50 flex items-end justify-center opacity-0 invisible bg-black/80 backdrop-blur-sm">
+        <div class="modal-content w-full max-w-md bg-brand-bg rounded-t-3xl border-t border-gray-800 p-4 pb-6 h-[95vh] max-h-[95vh] overflow-y-auto flex flex-col">
+            
+            <div class="flex justify-between items-center mb-3 shrink-0">
+                <h2 class="text-lg font-black text-brand-neon uppercase">Crystal Mines</h2>
+                <button onclick="closeModal('mines-modal')" class="w-8 h-8 rounded-full bg-gray-800 text-gray-400 flex items-center justify-center active:scale-90"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Compact Grid -->
+            <div class="bg-brand-surface p-3 rounded-2xl border border-gray-800 neon-glow relative mb-3 flex-1 flex flex-col justify-center min-h-[45vh]">
+                <div id="mines-grid" class="grid grid-cols-4 gap-1.5 w-full aspect-square max-w-[320px] mx-auto"></div>
+                <div id="mines-overlay" class="absolute inset-0 bg-black/90 rounded-2xl flex flex-col items-center justify-center hidden backdrop-blur-md z-20">
+                    <i class="fa-solid fa-bomb text-5xl text-red-500 mb-2 animate-bounce"></i>
+                    <h2 class="text-2xl font-black text-red-500 mb-2">BOOM!</h2>
+                    <button onclick="resetMinesUI()" class="px-6 py-2.5 bg-brand-accent text-white font-bold rounded-full neon-glow active:scale-95 mt-2">Try Again</button>
+                </div>
+            </div>
+
+            <!-- Compact Controls (Fixed for mobile) -->
+            <div class="bg-brand-surface p-3 rounded-xl border border-gray-800 flex flex-col gap-2 shrink-0">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-400 font-semibold">Bet Amount</span>
+                    <input type="number" id="bet-amount" value="100" class="w-20 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold text-white outline-none">
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-400 font-semibold">Potential Win (<span id="current-multiplier" class="text-brand-neon">1.00x</span>)</span>
+                    <span class="font-black text-green-400 text-lg" id="potential-win">0</span>
+                </div>
+                <div class="flex space-x-2 mt-1">
+                    <button id="start-mines-btn" onclick="startMinesGame()" class="flex-1 py-2.5 bg-brand-accent text-white font-black rounded-xl neon-glow active:scale-95">START</button>
+                    <button id="cashout-mines-btn" onclick="cashoutMines()" class="flex-1 py-2.5 bg-green-600 text-white font-black rounded-xl opacity-50 pointer-events-none">CASHOUT</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- NATIVE SOUND ENGINE ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, type, duration, vol=0.1) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            let osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + duration);
+        }
+        function soundFlip() { playTone(400, 'sine', 0.1, 0.05); }
+        function soundMatch() { playTone(800, 'sine', 0.1, 0.05); setTimeout(()=>playTone(1000, 'sine', 0.1, 0.05), 100); }
+        function soundBomb() { playTone(100, 'sawtooth', 0.6, 0.2); }
+        function soundGem() { playTone(900, 'sine', 0.1, 0.05); }
+        function soundWin() { playTone(440, 'sine', 0.15, 0.1); setTimeout(()=>playTone(554, 'sine', 0.15, 0.1), 150); setTimeout(()=>playTone(659, 'sine', 0.3, 0.1), 300); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                let tg = window.Telegram?.WebApp;
+                if (tg) { tg.ready(); tg.expand(); let user = tg.initDataUnsafe?.user; if (user?.first_name) document.getElementById('username').innerText = user.first_name; }
+            } catch(e) {}
+        });
+
+        let RewardedAd = null, InterstitialAd = null, TaskAd = null;
+        try {
+            if (window.Adsgram) {
+                RewardedAd = window.Adsgram.init({ blockId: "REWARDED_BLOCK_ID" });
+                InterstitialAd = window.Adsgram.init({ blockId: "INTERSTITIAL_BLOCK_ID" });
+                TaskAd = window.Adsgram.init({ blockId: "TASK_BLOCK_ID" });
+            }
+        } catch (e) {}
+
+        // --- PERSISTENCE: LOAD SAVED DATA ---
+        let gems = parseInt(localStorage.getItem('arcade_gems')) || 1000; 
+        document.getElementById('user-gems').innerText = gems;
+
+        function updateGems(amount) { 
+            gems += amount; 
+            document.getElementById('user-gems').innerText = gems; 
+            localStorage.setItem('arcade_gems', gems);
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(el => { el.classList.remove('text-brand-neon'); el.classList.add('text-gray-500'); });
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.getElementById('nav-' + tabId).classList.remove('text-gray-500'); document.getElementById('nav-' + tabId).classList.add('text-brand-neon');
+        }
+
+        function openModal(id) { 
+            document.getElementById(id).classList.add('open'); 
+            if(id === 'match-modal' && !firstCard && matchedPairs === 0) startMatchLevel(true);
+            if(id === 'mines-modal' && !mineActive) resetMinesUI();
+        }
+        function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+        function joinChannelTask(link) { window.open(link, '_blank'); setTimeout(() => { updateGems(500); alert("Reward Claimed! +500 Gems"); }, 2000); }
+        function watchTaskAd() { if(TaskAd) TaskAd.show().then(() => { updateGems(200); }).catch(()=>{}); else setTimeout(() => { updateGems(200); }, 500); }
+        function shareLink() {
+            // PUT YOUR BOT LINK HERE
+            let link = `https://t.me/share/url?url=https://t.me/YOUR_BOT_USERNAME/app&text=Play%20Games%20with%20me!`;
+            if (window.Telegram?.WebApp) window.Telegram.WebApp.openTelegramLink(link); else window.open(link, '_blank');
+        }
+
+        // ==================== GAME 1: EMOJI MATCH (With Persistence & Resume logic) ====================
+        const EMOJI_DB = ['🍎','🚀','💎','🤡','👻','🍔','🍉','🍕','🎸','🧩','🎲','⚽','🔥','⭐','🎈','🎁','🥑','🌮','🍩','🚗'];
+        
+        let currentMatchLevel = parseInt(localStorage.getItem('arcade_level')) || 1;
+        let maxLevelUnlocked = parseInt(localStorage.getItem('arcade_max_level')) || 1;
+        
+        let matchMoves = 3, matchedPairs = 0, totalPairs = 0, firstCard = null, lockMatchBoard = false;
+
+        function changeLevel(dir) {
+            let newLevel = currentMatchLevel + dir;
+            if(newLevel >= 1 && newLevel <= maxLevelUnlocked) {
+                currentMatchLevel = newLevel;
+                localStorage.setItem('arcade_level', currentMatchLevel);
+                startMatchLevel();
+            }
+        }
+
+        function startMatchLevel(resumeCheck = false) {
+            document.getElementById('match-overlay').classList.add('hidden');
+            document.getElementById('match-win-overlay').classList.add('hidden');
+            
+            // Only generate new board if it's a fresh start, not just opening the modal mid-game
+            if(resumeCheck && matchedPairs > 0 && matchedPairs < totalPairs && matchMoves > 0) return;
+
+            let grid = document.getElementById('match-grid');
+            grid.innerHTML = '';
+            document.getElementById('match-level-title').innerText = "LVL " + currentMatchLevel;
+            
+            matchMoves = 3; 
+            document.getElementById('match-moves').innerText = matchMoves;
+            matchedPairs = 0; firstCard = null; lockMatchBoard = false;
+
+            let totalCards = Math.min((currentMatchLevel * 2) + 2, 16);
+            totalPairs = totalCards / 2;
+            let cols = totalCards > 8 ? 'grid-cols-4' : (totalCards > 4 ? 'grid-cols-3' : 'grid-cols-2');
+            grid.className = `grid gap-2 mx-auto w-full max-w-[300px] ${cols}`;
+
+            let shuffledDb = [...EMOJI_DB].sort(() => 0.5 - Math.random());
+            let deck = [...shuffledDb.slice(0, totalPairs), ...shuffledDb.slice(0, totalPairs)].sort(() => 0.5 - Math.random()); 
+
+            deck.forEach((emoji) => {
+                let card = document.createElement('div');
+                card.className = 'flip-container';
+                card.dataset.emoji = emoji;
+                card.innerHTML = `<div class="flip-inner"><div class="flip-front"><i class="fa-solid fa-question text-gray-700"></i></div><div class="flip-back back-match">${emoji}</div></div>`;
+                card.onclick = () => handleCardClick(card);
+                grid.appendChild(card);
+            });
+        }
+
+        function handleCardClick(card) {
+            if(lockMatchBoard || card === firstCard || card.classList.contains('flipped')) return;
+            soundFlip();
+            card.classList.add('flipped');
+
+            if(!firstCard) { firstCard = card; return; }
+
+            lockMatchBoard = true;
+            let isMatch = firstCard.dataset.emoji === card.dataset.emoji;
+
+            if(isMatch) {
+                soundMatch();
+                firstCard.classList.add('matched'); card.classList.add('matched');
+                matchedPairs++; firstCard = null; lockMatchBoard = false;
+
+                if(matchedPairs === totalPairs) {
+                    setTimeout(() => {
+                        soundWin();
+                        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#a78bfa', '#8b5cf6', '#10b981'] });
+                        
+                        updateGems(currentMatchLevel * 50); 
+                        if(currentMatchLevel === maxLevelUnlocked) maxLevelUnlocked++;
+                        
+                        localStorage.setItem('arcade_max_level', maxLevelUnlocked);
+                        
+                        document.getElementById('win-level-num').innerText = currentMatchLevel;
+                        document.getElementById('match-win-overlay').classList.remove('hidden');
+                    }, 500);
+                }
+            } else {
+                matchMoves--;
+                document.getElementById('match-moves').innerText = matchMoves;
+                setTimeout(() => {
+                    firstCard.classList.remove('flipped'); card.classList.remove('flipped');
+                    firstCard = null; lockMatchBoard = false;
+                    if(matchMoves <= 0) document.getElementById('match-overlay').classList.remove('hidden');
+                }, 800);
+            }
+        }
+
+        function nextMatchLevel() {
+            currentMatchLevel++;
+            localStorage.setItem('arcade_level', currentMatchLevel);
+            if(InterstitialAd) InterstitialAd.show().catch(()=>{}); 
+            startMatchLevel();
+        }
+
+        function reviveMatchWithAd() {
+            // FIXED: This will ONLY hide overlay and add moves, NOT reset board
+            if(RewardedAd) {
+                RewardedAd.show().then(() => {
+                    document.getElementById('match-overlay').classList.add('hidden');
+                    matchMoves += 3; document.getElementById('match-moves').innerText = matchMoves;
+                }).catch(()=>{});
+            } else {
+                document.getElementById('match-overlay').classList.add('hidden');
+                matchMoves += 3; document.getElementById('match-moves').innerText = matchMoves;
+            }
+        }
+
+        // ==================== GAME 2: CRYSTAL MINES ====================
+        const minesGridEl = document.getElementById('mines-grid');
+        let mineActive = false, safeClicks = 0, currentBet = 0, bombIndices = [], currentMultiplier = 1.0;
+
+        function resetMinesUI() {
+            document.getElementById('mines-overlay').classList.add('hidden');
+            minesGridEl.innerHTML = '';
+            for(let i = 0; i < 16; i++) {
+                let box = document.createElement('div');
+                box.className = 'flip-container';
+                box.innerHTML = `<div class="flip-inner"><div class="flip-front"><i class="fa-solid fa-question text-gray-700"></i></div><div class="flip-back"></div></div>`;
+                box.onclick = () => handleMineClick(i, box);
+                minesGridEl.appendChild(box);
+            }
+            document.getElementById('start-mines-btn').disabled = false; document.getElementById('start-mines-btn').classList.remove('opacity-50', 'pointer-events-none');
+            document.getElementById('cashout-mines-btn').disabled = true; document.getElementById('cashout-mines-btn').classList.add('opacity-50', 'pointer-events-none');
+            document.getElementById('potential-win').innerText = "0"; document.getElementById('current-multiplier').innerText = "1.00x";
+            mineActive = false; safeClicks = 0; currentMultiplier = 1.0;
+        }
+
+        function startMinesGame() {
+            let betInput = parseInt(document.getElementById('bet-amount').value);
+            if(betInput > gems) return alert("Not enough gems!");
+            if(betInput <= 0) return alert("Enter valid bet!");
+
+            updateGems(-betInput);
+            currentBet = betInput; mineActive = true; safeClicks = 0; currentMultiplier = 1.0;
+            
+            bombIndices = [];
+            while(bombIndices.length < 3) { let r = Math.floor(Math.random() * 16); if(!bombIndices.includes(r)) bombIndices.push(r); }
+
+            document.getElementById('start-mines-btn').disabled = true; document.getElementById('start-mines-btn').classList.add('opacity-50', 'pointer-events-none');
+            document.getElementById('cashout-mines-btn').disabled = false; document.getElementById('cashout-mines-btn').classList.remove('opacity-50', 'pointer-events-none');
+            document.getElementById('potential-win').innerText = currentBet;
+        }
+
+        function handleMineClick(index, boxEl) {
+            if(!mineActive || boxEl.classList.contains('flipped')) return;
+            soundFlip();
+            boxEl.classList.add('flipped');
+            let backEl = boxEl.querySelector('.flip-back');
+
+            if(bombIndices.includes(index)) {
+                setTimeout(soundBomb, 200);
+                backEl.classList.add('back-mine-bomb');
+                backEl.innerHTML = '<i class="fa-solid fa-bomb text-white"></i>';
+                mineActive = false;
+                
+                setTimeout(() => {
+                    document.getElementById('mines-overlay').classList.remove('hidden');
+                    if(InterstitialAd) InterstitialAd.show().catch(()=>{});
+                }, 800);
+                
+                Array.from(minesGridEl.children).forEach((el, i) => {
+                    if(bombIndices.includes(i) && i !== index) {
+                        setTimeout(() => {
+                            el.classList.add('flipped');
+                            el.querySelector('.flip-back').classList.add('back-mine-bomb');
+                            el.querySelector('.flip-back').innerHTML = '<i class="fa-solid fa-bomb text-white/50"></i>';
+                        }, 400);
+                    }
+                });
+            } else {
+                setTimeout(soundGem, 200);
+                backEl.classList.add('back-mine-safe');
+                backEl.innerHTML = '<i class="fa-solid fa-gem text-brand-neon"></i>';
+                safeClicks++;
+                currentMultiplier += (0.10 + (safeClicks * 0.05)); 
+                document.getElementById('current-multiplier').innerText = currentMultiplier.toFixed(2) + "x";
+                document.getElementById('potential-win').innerText = Math.floor(currentBet * currentMultiplier);
+            }
+        }
+
+        function cashoutMines() {
+            if(!mineActive) return;
+            let winAmount = Math.floor(currentBet * currentMultiplier);
+            updateGems(winAmount);
+            mineActive = false;
+            alert(`Cashed out ${winAmount} Gems!`);
+            resetMinesUI();
+        }
+
+        window.onload = function() { startMatchLevel(true); resetMinesUI(); };
+    </script>
+</body>
+</html>
